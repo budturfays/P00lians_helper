@@ -56,7 +56,7 @@ $('go').addEventListener('click', async () => {
   out.className = '';
   out.style.display = 'none';
   try {
-    const res = await fetch('/functions/v1/admin-create-key', {
+    const res = await fetch('https://echmjatjbykqisyywydg.supabase.co/functions/v1/admin-create-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
       body: JSON.stringify({ days, note })
