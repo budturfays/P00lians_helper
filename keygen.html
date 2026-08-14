@@ -49,11 +49,15 @@
 
 <button id="go">Generate Key</button>
 
+<!-- Copy button is always visible; enabled only after a key is generated. -->
+<button id="copyBtn" disabled style="margin-top:10px;background:#22c55e;opacity:.4">Copy Key</button>
+
 <div id="out"></div>
 <small>Keys are unbound - the first PC that enters them claims them permanently.</small>
 
 <script>
 const $ = (id) => document.getElementById(id);
+let lastKey = '';
 
 function showCard(html) {
   const out = $('out');
@@ -61,11 +65,13 @@ function showCard(html) {
   out.innerHTML = html;
 }
 
-function copyKey(text, btn) {
+function copyToClipboard(text, btn, label) {
   const done = () => {
-    btn.textContent = 'Copied!';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = 'Copy Key'; btn.classList.remove('copied'); }, 1500);
+    if (btn) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = label; btn.classList.remove('copied'); }, 1500);
+    }
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
@@ -89,6 +95,10 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+$('copyBtn').addEventListener('click', () => {
+  if (lastKey) copyToClipboard(lastKey, $('copyBtn'), 'Copy Key');
+});
+
 $('go').addEventListener('click', async () => {
   const secret = $('secret').value.trim();
   const note = $('note').value.trim();
@@ -111,6 +121,9 @@ $('go').addEventListener('click', async () => {
       return;
     }
     const durLabel = days > 0 ? days + ' day(s)' : 'Lifetime';
+    lastKey = data.key;
+    $('copyBtn').disabled = false;
+    $('copyBtn').style.opacity = '1';
     showCard(
       '<div class="lbl">' + (note ? 'Key for ' + escapeHtml(note) : 'License key') + ' &mdash; ' + durLabel + '</div>' +
       '<div class="big" id="keyText">' + data.key + '</div>' +
@@ -120,7 +133,7 @@ $('go').addEventListener('click', async () => {
         '<button id="genAgain">Generate Another</button>' +
       '</div>'
     );
-    $('copy').addEventListener('click', () => copyKey(data.key, $('copy')));
+    $('copy').addEventListener('click', () => copyToClipboard(data.key, $('copy'), 'Copy Key'));
     $('genAgain').addEventListener('click', () => { $('note').value = ''; $('out').className = ''; $('out').innerHTML = ''; });
   } catch (e) {
     out.className = 'err';
