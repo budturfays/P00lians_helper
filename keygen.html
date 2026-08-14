@@ -11,12 +11,20 @@
   label{display:block;font-size:12px;color:#94a3b8;margin:14px 0 4px}
   input,select,button{width:100%;box-sizing:border-box;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:15px}
   input:focus,select:focus{outline:2px solid #38bdf8}
-  button{background:#0ea5e9;border:none;font-weight:700;margin-top:20px;cursor:pointer}
-  button:disabled{opacity:.5;cursor:wait}
-  #out{margin-top:18px;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,monospace;background:#0b1220;border:1px solid #334155;border-radius:8px;padding:14px;display:none;font-size:14px}
-  #out.ok{display:block;border-color:#22c55e;color:#bbf7d0}
-  #out.err{display:block;border-color:#ef4444;color:#fecaca}
-  .key{font-size:22px;letter-spacing:1px;color:#4ade80;font-weight:700}
+  #go{background:#0ea5e9;border:none;font-weight:700;margin-top:20px;cursor:pointer}
+  #go:disabled{opacity:.5;cursor:wait}
+  #out{margin-top:18px;display:none}
+  #out.ok{display:block}
+  #out.err{display:block;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,monospace;background:#0b1220;border:1px solid #ef4444;border-radius:8px;padding:14px;font-size:14px;color:#fecaca}
+  .card{background:#0b1220;border:1px solid #22c55e;border-radius:12px;padding:16px}
+  .card .lbl{font-size:12px;color:#94a3b8;margin-bottom:6px}
+  .card .big{font-size:24px;letter-spacing:1.5px;color:#4ade80;font-weight:700;word-break:break-all;margin-bottom:12px;user-select:all}
+  .card .meta{font-size:12px;color:#94a3b8;margin-bottom:12px}
+  .card .row{display:flex;gap:8px}
+  .card .row button{flex:1;margin-top:0}
+  #copy{background:#22c55e;border:none;font-weight:700;cursor:pointer}
+  #copy.copied{background:#16a34a}
+  #genAgain{background:#334155;border:1px solid #475569;cursor:pointer}
   small{color:#64748b;font-size:11px;display:block;margin-top:16px}
 </style>
 </head>
@@ -46,6 +54,41 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+
+function showCard(html) {
+  const out = $('out');
+  out.className = 'ok';
+  out.innerHTML = html;
+}
+
+function copyKey(text, btn) {
+  const done = () => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy Key'; btn.classList.remove('copied'); }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 $('go').addEventListener('click', async () => {
   const secret = $('secret').value.trim();
   const note = $('note').value.trim();
@@ -54,7 +97,7 @@ $('go').addEventListener('click', async () => {
   if (!secret) { out.className = 'err'; out.textContent = 'Enter your admin secret.'; return; }
   $('go').disabled = true;
   out.className = '';
-  out.style.display = 'none';
+  out.innerHTML = '';
   try {
     const res = await fetch('https://echmjatjbykqisyywydg.supabase.co/functions/v1/admin-create-key', {
       method: 'POST',
@@ -62,11 +105,26 @@ $('go').addEventListener('click', async () => {
       body: JSON.stringify({ days, note })
     });
     const data = await res.json();
-    if (!res.ok) { out.className = 'err'; out.textContent = 'Error: ' + (data.error || res.status); return; }
-    out.className = 'ok';
-    out.innerHTML = 'Key:<br><span class="key">' + data.key + '</span><br><br>Expires: ' + (data.expires_at || 'lifetime');
+    if (!res.ok) {
+      out.className = 'err';
+      out.textContent = 'Error: ' + (data.error || res.status);
+      return;
+    }
+    const durLabel = days > 0 ? days + ' day(s)' : 'Lifetime';
+    showCard(
+      '<div class="lbl">' + (note ? 'Key for ' + escapeHtml(note) : 'License key') + ' &mdash; ' + durLabel + '</div>' +
+      '<div class="big" id="keyText">' + data.key + '</div>' +
+      '<div class="meta">Expires: ' + (data.expires_at || 'lifetime') + '</div>' +
+      '<div class="row">' +
+        '<button id="copy">Copy Key</button>' +
+        '<button id="genAgain">Generate Another</button>' +
+      '</div>'
+    );
+    $('copy').addEventListener('click', () => copyKey(data.key, $('copy')));
+    $('genAgain').addEventListener('click', () => { $('note').value = ''; $('out').className = ''; $('out').innerHTML = ''; });
   } catch (e) {
-    out.className = 'err'; out.textContent = 'Network error: ' + e.message;
+    out.className = 'err';
+    out.textContent = 'Network error: ' + e.message;
   } finally {
     $('go').disabled = false;
   }
